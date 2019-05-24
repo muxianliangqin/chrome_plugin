@@ -1,4 +1,4 @@
-﻿var show_right_button = false
+﻿var show_context_menu = false
 var show_border = true
 console.log('这是content script!');
 
@@ -7,15 +7,15 @@ document.addEventListener('DOMContentLoaded', function()
 {
 	console.log('屏蔽右键菜单')
 	document.oncontextmenu = function(){
-		return show_right_button
+		return show_context_menu
 	}
 	console.log('监听鼠标点击事件')
 	document.onmousedown = function(e){
-		if (e.button==2){
+		if (e.button==2 && !show_context_menu){
 			var xpath = getXpath(e)
 			var as = getAs(e)
 			resShow(xpath,as)
-			show_right_button = true
+			show_context_menu = true
 			show_border = false
 		}
 	}
@@ -59,7 +59,7 @@ document.addEventListener('DOMContentLoaded', function()
 		paths = paths.slice(0,index)
 		//获取xpath值
 		paths = paths.reverse()
-		xp = ['']
+		var xp = ['']
 		var children = null
 		for(var i=0;i<paths.length;i++){
 			var path = paths[i]
@@ -76,7 +76,7 @@ document.addEventListener('DOMContentLoaded', function()
 				continue
 			}
 			// 只保留元素名相同的
-			x_children = []
+			var x_children = []
 			for(var j=0;j<children.length;j++){
 				if (children[j].localName == path.localName){
 					x_children.push(children[j])
@@ -103,38 +103,36 @@ document.addEventListener('DOMContentLoaded', function()
 	}
 	
 	function resShow(xpath,as){
-		var div = $('<div></div>')
-		div.addClass('chrome-plugin-demo-panel')
-		var span = $('<span>xpath:'+xpath+'</span>')
-		div.append(span)
-		
-		var ul = $('<ul></ul>')
+		let div = `
+		<div class="crawler-result-show">
+			<p><span>xpath:'+xpath+'</span></p>
+			<ul></ul>
+		</div>
+		`
+		div = $(div)
+		var ul = div.find('ul')
 		for (var i=0;i<as.length;i++){
 			var a = as[i]
 			ul.append($('<li><a href='+a.href+' target="_blank">'+a.title+'</a></li>'))
 		}
-		div.append(ul)
-		
-		var buttom_comfirm = $('<button style="margin-right:10px;">确定选择</button>')
-		buttom_comfirm.click(function(){
-			confirm_result()
-		})
-		var buttom_reselect = $('<button style="margin-left:10px;">重新选择</button>')
-		buttom_reselect.click(function(){
-			remove_result_show()
-		})
-		var p = $('<p></p>')
-		p.append(buttom_comfirm)
-		p.append(buttom_reselect)
-		div.append(p)
-		
+		let button_submit = $('<button style="margin-right:10px;">确定选择</button>')
+        button_submit.click(function(){
+            confirm_result()
+        })
+		let button_reselect = $('<button style="margin-left:10px;">重新选择</button>')
+        button_reselect.click(function(){
+            remove_result_show()
+        })
+        div.append(button_submit)
+        div.append(button_reselect)
 		$('body').append(div)
 	}
 
 	function confirm_result(){
 		remove_result_show()
 		$.ajax({
-			url:'http://47.106.140.189:7001/weChat/findGroups',
+			url:'http://47.106.140.189/weChat/findGroups',
+			// url:'https://www.aiqiyue.xyz/weChat/findGroups',
 			method: 'post',
 			data:{
 				'userId':3
@@ -145,12 +143,12 @@ document.addEventListener('DOMContentLoaded', function()
 	}
 
 	function remove_result_show () {
-		$('.chrome-plugin-demo-panel').remove()
-		show_right_button = false
+		$('.crawler-result-show').remove()
+		show_context_menu = false
 		show_border = true
 	}
 	
-	document.onmouseover = function(e){	
+	document.onmouseover = function(e){
 		if (show_border){
 			$(e.srcElement).addClass('myself-mouseover-selected')
 		}
@@ -162,100 +160,3 @@ document.addEventListener('DOMContentLoaded', function()
 	}
 	
 });
-
-// 向页面注入JS
-function injectCustomJs(jsPath)
-{
-	jsPath = jsPath || 'js/inject.js';
-	var temp = document.createElement('script');
-	temp.setAttribute('type', 'text/javascript');
-	// 获得的地址类似：chrome-extension://ihcokhadfjfchaeagdoclpnjdiokfakg/js/inject.js
-	temp.src = chrome.extension.getURL(jsPath);
-	temp.onload = function()
-	{
-		// 放在页面不好看，执行完后移除掉
-		this.parentNode.removeChild(this);
-	};
-	document.body.appendChild(temp);
-}
-
-// 接收来自后台的消息
-chrome.runtime.onMessage.addListener(function(request, sender, sendResponse)
-{
-	console.log('收到来自 ' + (sender.tab ? "content-script(" + sender.tab.url + ")" : "popup或者background") + ' 的消息：', request);
-	if(request.cmd == 'update_font_size') {
-		var ele = document.createElement('style');
-		ele.innerHTML = `* {font-size: ${request.size}px !important;}`;
-		document.head.appendChild(ele);
-	}
-	else {
-		tip(JSON.stringify(request));
-		sendResponse('我收到你的消息了：'+JSON.stringify(request));
-	}
-});
-
-// 主动发送消息给后台
-// 要演示此功能，请打开控制台主动执行sendMessageToBackground()
-function sendMessageToBackground(message) {
-	chrome.runtime.sendMessage({greeting: message || '你好，我是content-script呀，我主动发消息给后台！'}, function(response) {
-		tip('收到来自后台的回复：' + response);
-	});
-}
-
-// 监听长连接
-chrome.runtime.onConnect.addListener(function(port) {
-	console.log(port);
-	if(port.name == 'test-connect') {
-		port.onMessage.addListener(function(msg) {
-			console.log('收到长连接消息：', msg);
-			tip('收到长连接消息：' + JSON.stringify(msg));
-			if(msg.question == '你是谁啊？') port.postMessage({answer: '我是你爸！'});
-		});
-	}
-});
-
-window.addEventListener("message", function(e)
-{
-	console.log('收到消息：', e.data);
-	if(e.data && e.data.cmd == 'invoke') {
-		eval('('+e.data.code+')');
-	}
-	else if(e.data && e.data.cmd == 'message') {
-		tip(e.data.data);
-	}
-}, false);
-
-
-function initCustomEventListen() {
-	var hiddenDiv = document.getElementById('myCustomEventDiv');
-	if(!hiddenDiv) {
-		hiddenDiv = document.createElement('div');
-		hiddenDiv.style.display = 'none';
-		hiddenDiv.id = 'myCustomEventDiv';
-		document.body.appendChild(hiddenDiv);
-	}
-	hiddenDiv.addEventListener('myCustomEvent', function() {
-		var eventData = document.getElementById('myCustomEventDiv').innerText;
-		tip('收到自定义事件：' + eventData);
-	});
-}
-
-var tipCount = 0;
-// 简单的消息通知
-function tip(info) {
-	info = info || '';
-	var ele = document.createElement('div');
-	ele.className = 'chrome-plugin-simple-tip slideInLeft';
-	ele.style.top = tipCount * 70 + 20 + 'px';
-	ele.innerHTML = `<div>${info}</div>`;
-	document.body.appendChild(ele);
-	ele.classList.add('animated');
-	tipCount++;
-	setTimeout(() => {
-		ele.style.top = '-100px';
-		setTimeout(() => {
-			ele.remove();
-			tipCount--;
-		}, 400);
-	}, 3000);
-}

@@ -1,50 +1,49 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <meta charset="utf-8"/>
-	<title>插件配置页</title>
-	<style>
-	body{
-		font-size: 16px;
-		width: 400px; 
-		height: 300px;
-		padding: 10px;
-		font-family: 'Microsoft Yahei'; 
-	}
-	#status {
-		color:red;
-	}
-	.input {
-		display: inline-block;
-		height: 16px;
-		line-height: 1.5;
-		padding: 4px 7px;
-		font-size: 12px;
-		border-radius: 4px;
-	}
-	.span { 
-		width:100px;
-	}
-	</style>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <style>
+        input[type=submit]{
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        td{
+            padding: 0.25rem;
+        }
+        .success{
+            color:green;
+        }
+        .fail{
+            color:red
+        }
+    </style>
 </head>
 <body>
-	<h1>用户配置</h1>
-	<form>
-		<table>
-			<tbody>
-				<tr>
-					<td><span class='span'>用户名：</span></td>
-					<td><input type='text' class='input'/></td>
-				</tr>
-				<tr>
-					<td><span class='span'>密码：</span></td>
-					<td><input type='password' class='input'/></td>
-				</tr>
-			</tbody>
-		</table>
-		<p>
-			<input type='submit' value='确认'>
-		</p>
-	</form>
+<table>
+    <colgroup>
+        <col width="30%"/>
+        <col width="40%"/>
+        <col width="30%"/>
+    </colgroup>
+    <tbody>
+    <tr>
+        <td colspan="3" style="text-align: center"><h1>请配置插件秘钥</h1></td>
+    </tr>
+    <tr>
+        <td style="text-align: right">秘钥：</td>
+        <td><input type="password" id="token" placeholder="请输入秘钥"></td>
+        <td><span id="tip" class="success"></span></td>
+    </tr>
+    <tr>
+        <td colspan="2" style="text-align: center">
+            <input type="submit" value="确定" id="submit">
+        </td>
+    </tr>
+    </tbody>
+    <script src="js/jquery-1.8.3.js"></script>
+    <script src="js/options.js"></script>
+</table>
 </body>
 </html>
