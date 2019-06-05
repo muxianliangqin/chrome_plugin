@@ -20,12 +20,12 @@ document.addEventListener('DOMContentLoaded', function()
 			show_border = false
 		}
 	}
-	
+
 	function getRes(e){
-		var ele = e.srcElement;
-		var as = $(ele).find('a:visible');
-		var res = {
-		    origin: e.currentTarget.origin,
+        let ele = e.srcElement;
+        let as = $(ele).find('a:visible');
+        let res = {
+            origin: e.currentTarget.domain,
             baseURI: e.currentTarget.baseURI,
             title: e.currentTarget.title,
             charset: e.currentTarget.charset,
@@ -55,7 +55,7 @@ document.addEventListener('DOMContentLoaded', function()
 
 		return res
 	}
-	
+
 	function getXpath(e){
 		var paths = e.path;
 		// 去除window、document、html等,从body开始
@@ -116,7 +116,7 @@ document.addEventListener('DOMContentLoaded', function()
 		var xpath = xp.join('/')
 		return xpath
 	}
-	
+
 	function resShow(res){
 		let div = `
 		<div class="crawler-result-show">
@@ -223,26 +223,25 @@ document.addEventListener('DOMContentLoaded', function()
             let userInfo = value.userInfo
             if (userInfo) {
                 res.userId = userInfo.id
-                res = JSON.stringify(res)
                 $.ajax({
                     // url:'http://47.106.140.189/weChat/plugin/save',
                     url:'http://localhost:7020/plugin/save',
                     // url:'https://www.aiqiyue.xyz/weChat/findGroups',
                     type: 'post',
-                    traditional: true,
-                    data: JSON.parse(res),
-                }).done(function(response){
-                    if (response.errorCode === '0000') {
-                        alert('添加成功')
-                        remove_result_show()
-                    } else {
-                        alert('添加失败，原因：' + response.errorMsg)
-                    }
+                    // traditional: true,
+                    data: {
+                        crawlerResult: JSON.stringify(res)
+					},
+					async: true,
+					dataType: 'json'
+                }).success(function(response){
+                    alert('添加成功')
+                    remove_result_show()
                 }).fail(function (response) {
-
+                    alert('添加失败')
                 })
             } else {
-                alert('添加失败，请前往【chrome设置->更多工具->扩展程序->详细信息->扩展程序选项】配置秘钥')
+                alert('操作失败，请前往【chrome设置->更多工具->扩展程序->详细信息->扩展程序选项】配置秘钥')
             }
         })
 	}
@@ -252,7 +251,7 @@ document.addEventListener('DOMContentLoaded', function()
 		show_context_menu = false
 		show_border = true
 	}
-	
+
 	document.onmouseover = function(e){
 		if (show_border){
 			$(e.srcElement).addClass('myself-mouseover-selected')
@@ -263,5 +262,5 @@ document.addEventListener('DOMContentLoaded', function()
 			$(e.srcElement).removeClass('myself-mouseover-selected')
 		}
 	}
-	
+
 });

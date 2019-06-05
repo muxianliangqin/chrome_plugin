@@ -13,8 +13,8 @@ $(function () {
             token: $('#token').val()
         }
         $.ajax({
-            method:'post',
-            url:'http://localhost:7010/checkToken',
+            type:'post',
+            url:'http://47.106.140.189/user/checkToken',
             data:param
         }).done(function (response) {
             if (response.errorCode == '0000') {
@@ -32,6 +32,8 @@ $(function () {
                 });
 
             }
+        }).fail(function (response) {
+            $('#tip').html('操作失败，网络异常').removeClass('success').addClass('fail')
         })
     })
 })
