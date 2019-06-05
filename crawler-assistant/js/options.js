@@ -18,7 +18,7 @@ $(function () {
             data:param
         }).done(function (response) {
             if (response.errorCode == '0000') {
-                param.userInfo = response.userInfo
+                param.userInfo = response.content
                 chrome.storage.sync.set(param, function() {
                     $('#tip').html('token配置成功').removeClass('fail').addClass('success')
                 });

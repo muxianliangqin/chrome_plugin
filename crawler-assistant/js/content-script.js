@@ -13,46 +13,61 @@ document.addEventListener('DOMContentLoaded', function()
 	document.onmousedown = function(e){
 		if (e.button==2 && !show_context_menu){
 			var xpath = getXpath(e)
-			var as = getAs(e)
-			resShow(xpath,as)
+			var res = getRes(e)
+            res.xpath = xpath
+			resShow(res)
 			show_context_menu = true
 			show_border = false
 		}
 	}
 	
-	function getAs(e){
-		var ele = e.srcElement
-		var as = $(ele).find('a')
-		var res = []
+	function getRes(e){
+		var ele = e.srcElement;
+		var as = $(ele).find('a:visible');
+		var res = {
+		    origin: e.currentTarget.origin,
+            baseURI: e.currentTarget.baseURI,
+            title: e.currentTarget.title,
+            charset: e.currentTarget.charset,
+            clientWidth: e.currentTarget.documentElement.clientWidth,
+            clientHeight: e.currentTarget.documentElement.clientHeight,
+            validResults: [],
+            invalidResults: []
+        }
+        let invalidRegex = /^首页|下一页|确定|末页|\d+$/
 		for (var i=0;i<as.length;i++){
-			var a = as[i]
-			var title = a.title
-			if (!title){
-				title = a.innerText
-			}
-			a = {
-				'host':a.host,
-				'baseURI':a.baseURI,
-				'href':a.href,
-				'title':title
-			}
-			res.push(a)
+			var a = as[i];
+			var title = a.title;
+			if (!title) {
+                title = a.innerText
+            }
+			if (invalidRegex.test(title)) {
+                res.invalidResults.push({
+                    'title':title
+                })
+            } else {
+                res.validResults.push({
+                    'href':a.href,
+                    'title':title
+                })
+            }
 		}
+
 		return res
 	}
 	
 	function getXpath(e){
-		var paths = e.path
+		var paths = e.path;
 		// 去除window、document、html等,从body开始
-		paths.reverse()
-		paths = paths.slice(3)
+		paths.reverse();
+		paths = paths.slice(3);
 		// 寻找最后一个具有id属性的元素
-		paths = paths.reverse()
-		var index = paths.length
+		paths = paths.reverse();
+		var index = paths.length;
 		for(var i=0;i<paths.length;i++){
-			var v = paths[i]
+			var v = paths[i];
 			if (v.id) {
-				index = i + 1 
+				index = i + 1;
 				break;
 			}
 		}
@@ -102,44 +117,134 @@ document.addEventListener('DOMContentLoaded', function()
 		return xpath
 	}
 	
-	function resShow(xpath,as){
+	function resShow(res){
 		let div = `
 		<div class="crawler-result-show">
-			<p><span>xpath:'+xpath+'</span></p>
-			<ul></ul>
+			<div class="self-header">
+			    <h3>网站详情</h3>
+			    <table>
+			        <colgroup>
+                        <col width="30%">
+                        <col width="70%">
+                    </colgroup>
+			        <tbody>
+			            <tr>
+			                <td>主页链接</td>
+			                <td id="self-web-info-origin"></td>
+                        </tr>
+                        <tr>
+			                <td>分类标题</td>
+			                <td id="self-web-info-title"></td>
+                        </tr>
+                        <tr>
+			                <td>主页链接</td>
+			                <td id="self-web-info-baseURI"></td>
+                        </tr>
+                        <tr>
+			                <td>网站编码</td>
+			                <td id="self-web-info-charset"></td>
+                        </tr>
+                        <tr>
+			                <td>元素路径</td>
+			                <td id="self-web-info-xpath"></td>
+                        </tr>
+                    </tbody>
+                </table>
+			</div>
+			<div class="self-content">
+			    <h3>选择结果</h3>
+			    <div class="self-res-div">
+			        <table id="self-result-table">
+                        <colgroup>
+                            <col width="5%">
+                            <col width="95%">
+                        </colgroup>
+                        <tbody>
+                        </tbody>
+			        </table>
+                </div>
+            </div>
+            <div class="self-footer">
+            </div>
 		</div>
 		`
 		div = $(div)
-		var ul = div.find('ul')
-		for (var i=0;i<as.length;i++){
-			var a = as[i]
-			ul.append($('<li><a href='+a.href+' target="_blank">'+a.title+'</a></li>'))
+        div.find('#self-web-info-origin').html(res.origin);
+        div.find('#self-web-info-title').html(res.title);
+        div.find('#self-web-info-baseURI').html(res.baseURI);
+        div.find('#self-web-info-charset').html(res.charset);
+        div.find('#self-web-info-xpath').html(res.xpath);
+        div.find('.self-res-div').css({
+            'max-height': res.clientHeight - 350 + 'px',
+            'max-width': res.clientWidth * 0.5 + 'px',
+        })
+        var tbody = div.find('#self-result-table tbody');
+        tbody.append($('<tr><td colspan="2">有效结果</td></tr>'))
+        let validResults = res.validResults;
+        for (var i=0;i<validResults.length;i++){
+            var a = validResults[i];
+            tbody.append(
+			    $('<tr>' +
+                    '<td style="text-align: right;">'+(i+1)+'</td>' +
+                    '<td><a href='+a.href+' target="_blank">'+a.title+'</a></td>' +
+                '</tr>')
+            );
 		}
-		let button_submit = $('<button style="margin-right:10px;">确定选择</button>')
+        tbody.append($('<tr><td colspan="2">无效结果</td></tr>'))
+        let invalidResults = res.invalidResults;
+        for (var i=0;i<invalidResults.length;i++){
+            var a = invalidResults[i];
+            tbody.append(
+                $('<tr>' +
+                    '<td style="text-align: right;">'+(i+1)+'</td>' +
+                    '<td><span>'+a.title+'</span></td>' +
+                '</tr>')
+            );
+        }
+		let button_submit = $('<button style="margin-right:10px;">确定选择</button>');
         button_submit.click(function(){
-            confirm_result()
-        })
-		let button_reselect = $('<button style="margin-left:10px;">重新选择</button>')
+            confirm_result(res);
+        });
+		let button_reselect = $('<button style="margin-left:10px;">重新选择</button>');
         button_reselect.click(function(){
-            remove_result_show()
-        })
-        div.append(button_submit)
-        div.append(button_reselect)
-		$('body').append(div)
+            remove_result_show();
+        });
+        let footer = div.find('.self-footer');
+        footer.append(button_submit);
+        footer.append(button_reselect);
+		$('body').append(div);
 	}
 
-	function confirm_result(){
-		remove_result_show()
-		$.ajax({
-			url:'http://47.106.140.189/weChat/findGroups',
-			// url:'https://www.aiqiyue.xyz/weChat/findGroups',
-			method: 'post',
-			data:{
-				'userId':3
-			}
-		}).done(function(response){
-			console.log(response)
-		})
+	function confirm_result(res){
+        let config = {
+            userInfo:null
+        }
+        chrome.storage.sync.get(config,function (value) {
+            let userInfo = value.userInfo
+            if (userInfo) {
+                res.userId = userInfo.id
+                res = JSON.stringify(res)
+                $.ajax({
+                    // url:'http://47.106.140.189/weChat/plugin/save',
+                    url:'http://localhost:7020/plugin/save',
+                    // url:'https://www.aiqiyue.xyz/weChat/findGroups',
+                    type: 'post',
+                    traditional: true,
+                    data: JSON.parse(res),
+                }).done(function(response){
+                    if (response.errorCode === '0000') {
+                        alert('添加成功')
+                        remove_result_show()
+                    } else {
+                        alert('添加失败，原因：' + response.errorMsg)
+                    }
+                }).fail(function (response) {
+
+                })
+            } else {
+                alert('添加失败，请前往【chrome设置->更多工具->扩展程序->详细信息->扩展程序选项】配置秘钥')
+            }
+        })
 	}
 
 	function remove_result_show () {
