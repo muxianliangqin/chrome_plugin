@@ -16,7 +16,7 @@ document.addEventListener('DOMContentLoaded', function()
 			var res = getRes(e)
             res.xpath = xpath
 			resShow(res)
-			show_context_menu = true
+			// show_context_menu = true
 			show_border = false
 		}
 	}
@@ -154,7 +154,7 @@ document.addEventListener('DOMContentLoaded', function()
 			<div class="self-content">
 			    <h3>选择结果</h3>
 			    <div class="self-res-div">
-			        <table id="self-result-table">
+			        <table id="self-result-table" style="width: 100%">
                         <colgroup>
                             <col width="5%">
                             <col width="95%">
