@@ -23,7 +23,7 @@ document.addEventListener('DOMContentLoaded', function()
 
 	function getRes(e){
         let ele = e.srcElement;
-        let as = $(ele).find('a:visible');
+        let as = $(ele).find('a');
         let res = {
             origin: e.currentTarget.domain,
             baseURI: e.currentTarget.baseURI,
@@ -34,14 +34,16 @@ document.addEventListener('DOMContentLoaded', function()
             validResults: [],
             invalidResults: []
         }
-        let invalidRegex = /^首页|下一页|确定|末页|\d+$/
+        let invalidTitle = /^首页|下一页|上一页|确定|末页|尾页|\d+$/
+        let invalidHref = /^(\.\/|\.\.\/)((\.\.\/)+)?$/
 		for (var i=0;i<as.length;i++){
 			var a = as[i];
 			var title = a.title;
 			if (!title) {
                 title = a.innerText
             }
-			if (invalidRegex.test(title)) {
+            let href = a.attributes['href'].nodeValue
+			if (invalidTitle.test(title) | invalidHref.test(href)) {
                 res.invalidResults.push({
                     'title':title
                 })
@@ -224,8 +226,8 @@ document.addEventListener('DOMContentLoaded', function()
             if (userInfo) {
                 res.userId = userInfo.id
                 $.ajax({
-                    // url:'http://47.106.140.189/weChat/plugin/save',
-                    url:'http://localhost:7020/plugin/save',
+                    url:'http://47.106.140.189/weChat/plugin/save',
+                    // url:'http://localhost:7020/plugin/save',
                     // url:'https://www.aiqiyue.xyz/weChat/findGroups',
                     type: 'post',
                     // traditional: true,

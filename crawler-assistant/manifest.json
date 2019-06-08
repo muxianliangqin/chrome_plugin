@@ -1,6 +1,6 @@
 {
   "manifest_version": 2,
-  "name": "xx助手",
+  "name": "网络爬虫助手",
   "version": "1.0",
   "description": "鼠标悬浮选择区域，右键选定，点击确认保存选择",
   "author": "qiyue",
