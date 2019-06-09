@@ -15,6 +15,7 @@ $(function () {
         $.ajax({
             type:'post',
             url:'http://47.106.140.189/user/checkToken',
+            // url:'http://localhost:7010/checkToken',
             data:param
         }).done(function (response) {
             if (response.errorCode == '0000') {

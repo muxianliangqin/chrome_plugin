@@ -11,7 +11,8 @@ document.addEventListener('DOMContentLoaded', function()
 	}
 	console.log('监听鼠标点击事件')
 	document.onmousedown = function(e){
-		if (e.button==2 && !show_context_menu){
+		if (e.button==2 && !show_context_menu && $('.crawler-result-show').length == 0){
+			let show = $('.crawler-result-show')
 			var xpath = getXpath(e)
 			var res = getRes(e)
             res.xpath = xpath
@@ -34,7 +35,7 @@ document.addEventListener('DOMContentLoaded', function()
             validResults: [],
             invalidResults: []
         }
-        let invalidTitle = /^首页|下一页|上一页|确定|末页|尾页|\d+$/
+        let invalidTitle = /^(首页|下一页|上一页|确定|末页|尾页|更多(>>)?|\d+)$/
         let invalidHref = /^(\.\/|\.\.\/)((\.\.\/)+)?$/
 		for (var i=0;i<as.length;i++){
 			var a = as[i];
@@ -88,7 +89,7 @@ document.addEventListener('DOMContentLoaded', function()
 			}
 			// children == null时，这里通常是html/body
 			if (children == null) {
-				xp.push(path.localName)
+				xp.push('/' + path.localName)
 				children = path.children
 				continue
 			}
@@ -121,10 +122,10 @@ document.addEventListener('DOMContentLoaded', function()
 
 	function resShow(res){
 		let div = `
-		<div class="crawler-result-show">
+		<div class="crawler-result-show" style="text-align: left">
 			<div class="self-header">
 			    <h3>网站详情</h3>
-			    <table>
+			    <table style="width: 100%">
 			        <colgroup>
                         <col width="30%">
                         <col width="70%">
@@ -226,9 +227,8 @@ document.addEventListener('DOMContentLoaded', function()
             if (userInfo) {
                 res.userId = userInfo.id
                 $.ajax({
-                    url:'http://47.106.140.189/weChat/plugin/save',
+                    url:'http://47.106.140.189/crawler/plugin/save',
                     // url:'http://localhost:7020/plugin/save',
-                    // url:'https://www.aiqiyue.xyz/weChat/findGroups',
                     type: 'post',
                     // traditional: true,
                     data: {
