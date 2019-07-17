@@ -27,10 +27,13 @@ document.addEventListener('DOMContentLoaded', function()
                 resultShow(res);
             } else if (action === 'text') {
                 let text = getText(e);
-                let domain = e.currentTarget.domain;
+                let url = e.currentTarget.baseURI;
                 chrome.storage.local.get({'result': {}}, function (value) {
                     let res = value.result;
-                    if (res.origin !== domain) {
+                    let validResults = res.validResults;
+                    if (!validResults
+                        || validResults.length === 0
+                        || validResults[0].href !== url) {
                         res = {
                             origin: '',
                             baseURI: '',
@@ -153,6 +156,10 @@ document.addEventListener('DOMContentLoaded', function()
 
 		return res
 	}
+
+    function getText(e){
+        return e.srcElement.innerText;
+    }
 
 	function resultShow(res){
 		let div = `
@@ -334,6 +341,8 @@ document.addEventListener('DOMContentLoaded', function()
 					dataType: 'json'
                 }).success(function(response){
                     alert('添加成功');
+                    saveLocalStorage({'action':'title'});
+                    action = 'title';
                     remove_result_show();
                 }).fail(function (response) {
                     alert('添加失败')
@@ -348,10 +357,6 @@ document.addEventListener('DOMContentLoaded', function()
 		$('.crawler-result-show').remove();
 		show_context_menu = false;
 		show_border = true;
-	}
-
-	function getText(e){
-		return e.srcElement.innerText;
 	}
 
 	document.onmouseover = function(e){
