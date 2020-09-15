@@ -5,63 +5,76 @@ let action = '';
 console.log('这是content script!');
 
 // 注意，必须设置了run_at=document_start 此段代码才会生效
-document.addEventListener('DOMContentLoaded', function()
-{
-	console.log('屏蔽右键菜单');
-	document.oncontextmenu = function(){
-		return show_context_menu;
-	};
+document.addEventListener('DOMContentLoaded', function () {
+    console.log('屏蔽右键菜单');
+    document.oncontextmenu = function () {
+        return show_context_menu;
+    };
 
     chrome.storage.local.get({action: ''}, function (value) {
         action = value.action || 'title';
     });
 
     console.log('监听鼠标点击事件');
-	document.onmousedown = function(e){
-		if (e.button=== 2 && !show_context_menu && $('.crawler-result-show').length == 0){
-			// let show = $('.crawler-result-show');
-			let xpath = getXpath(e);
+    document.onmousedown = function (e) {
+        if (e.button === 2 && !show_context_menu && $('.crawler-result-show').length == 0) {
+            // let show = $('.crawler-result-show');
+            let xpath = getXpath(e);
             if (action === 'title') {
                 let res = getTitle(e);
-                res.xpathTitle = xpath;
+                res.xpathArticleTitle = xpath;
                 resultShow(res);
             } else if (action === 'text') {
                 let text = getText(e);
-                let url = e.currentTarget.baseURI;
-                chrome.storage.local.get({'result': {}}, function (value) {
-                    let res = value.result;
-                    let validResults = res.validResults;
-                    if (!validResults
-                        || validResults.length === 0
-                        || validResults[0].href !== url) {
-                        res = {
-                            origin: '',
-                            baseURI: '',
-                            title: '',
-                            charset: '',
-                            validResults: [],
-                            invalidResults: []
-                        };
-                    }
+                let html = getHtml(e);
+                chrome.storage.local.get({'crawlerResult': {}}, function (value) {
+                    let res = value.crawlerResult;
                     res.text = text;
-                    res.xpathText = xpath;
+                    res.html = html;
+                    res.xpathArticleContent = xpath;
                     resultShow(res);
                 });
-
             }
+            // show_context_menu = true
+            show_border = false;
+        }
+    };
 
-			// show_context_menu = true
-			show_border = false;
-		}
-	};
+    /**
+     * 爬取结果对象初始化
+     * @returns
+     */
+    function crawlerResult() {
+        return {
+            webUrl: '',
+            columnUrl: '',
+            columnTitle: '',
+            charset: '',
+            xpathArticleTitle: '',
+            xpathArticleContent: '',
+            text: '',
+            html: '',
+            articleList: [],
+            invalidResults: []
+        }
+    }
 
-	function saveLocalStorage(config) {
+    /**
+     * 浏览器本地保存
+     * @param config
+     */
+    function saveLocalStorage(config) {
         chrome.storage.local.set(config, function () {
             console.log('saveLocalStorage成功');
         })
     }
 
-    function getXpath(e){
+    /**
+     * 根据鼠标点击获取点击区域的xpath
+     * @param e
+     * @returns {string}
+     */
+    function getXpath(e) {
         // 去除window、document、html等,从body开始
         let paths = e.path;
         paths.reverse();
@@ -69,23 +82,23 @@ document.addEventListener('DOMContentLoaded', function()
         // 寻找最后一个具有id属性的元素
         paths = paths.reverse();
         let index = paths.length;
-        for(let i=0;i<paths.length;i++){
+        for (let i = 0; i < paths.length; i++) {
             let v = paths[i];
             if (v.id) {
                 index = i + 1;
                 break;
             }
         }
-        paths = paths.slice(0,index);
+        paths = paths.slice(0, index);
         //获取xpath值
         paths = paths.reverse();
         let xp = [''];
         let children = null;
-        for(let i=0;i<paths.length;i++){
+        for (let i = 0; i < paths.length; i++) {
             let path = paths[i];
             // 如果元素有id，这里通常是第一个
             if (path.id) {
-                xp.push('/*[@id="'+path.id+'"]');
+                xp.push('/*[@id="' + path.id + '"]');
                 children = path.children;
                 continue
             }
@@ -97,8 +110,8 @@ document.addEventListener('DOMContentLoaded', function()
             }
             // 只保留元素名相同的
             let x_children = [];
-            for(let j=0;j<children.length;j++){
-                if (children[j].localName === path.localName){
+            for (let j = 0; j < children.length; j++) {
+                if (children[j].localName === path.localName) {
                     x_children.push(children[j])
                 }
             }
@@ -107,9 +120,9 @@ document.addEventListener('DOMContentLoaded', function()
                 xp.push(path.localName)
             } else {
                 let x_idx = 0;
-                for(let j=0;j<x_children.length;j++){
-                    if (x_children[j] === path){
-                        xp.push(path.localName+'['+(x_idx+1)+']');
+                for (let j = 0; j < x_children.length; j++) {
+                    if (x_children[j] === path) {
+                        xp.push(path.localName + '[' + (x_idx + 1) + ']');
                         break
                     } else {
                         x_idx = x_idx + 1;
@@ -121,48 +134,96 @@ document.addEventListener('DOMContentLoaded', function()
         return xp.join('/');
     }
 
-	function getTitle(e){
-		let srcElement = e.srcElement;
-		let currentTarget = e.currentTarget;
+    /**
+     * 获取标题数组
+     * @param e 鼠标点击div时间
+     * @returns {{webUrl: string, columnUrl: string, columnTitle: string, charset: string, xpathArticleTitle: string, xpathArticleContent: string, articleList: Array, invalidResults: Array}}
+     */
+    function getTitle(e) {
+        let srcElement = e.srcElement;
+        let currentTarget = e.currentTarget;
         let as = $(srcElement).find('a');
-        let res = {
-            origin: currentTarget.domain,
-            baseURI: currentTarget.baseURI,
-            title: currentTarget.title,
-            charset: currentTarget.charset,
-            validResults: [],
-            invalidResults: []
-        };
+        const res = crawlerResult();
+        res.webUrl = currentTarget.domain;
+        res.columnUrl = currentTarget.baseURI;
+        res.columnTitle = currentTarget.title;
+        res.charset = currentTarget.charset;
         let invalidTitle = /^(首页|下一页|上一页|确定|末页|尾页|更多(\s+>>)?|\d+)$/;
         let invalidHref = /^(\.\/|\.\.\/)((\.\.\/)+)?$/;
-		for (let i=0;i<as.length;i++){
-			let a = as[i];
-			let title = a.title;
-			if (!title) {
+        for (let i = 0; i < as.length; i++) {
+            let a = as[i];
+            if (!a.attributes['href']) {
+                continue
+            }
+            let title = a.title;
+            if (!title) {
                 title = a.innerText
             }
-            let href = a.attributes['href'].nodeValue;
-			if (invalidTitle.test(title) || invalidHref.test(href)) {
+            let href = a.attributes['href'].value;
+            if (invalidTitle.test(title) || invalidHref.test(href)) {
                 res.invalidResults.push({
-                    'title':title
+                    'title': title
                 })
             } else {
-                res.validResults.push({
-                    'href':a.href,
-                    'title':title
+                res.articleList.push({
+                    'url': a.href,
+                    'title': title
                 })
             }
-		}
+        }
+        return res
+    }
 
-		return res
-	}
-
-    function getText(e){
+    /**
+     * 获取内容正文
+     * @param e
+     * @returns {string}
+     */
+    function getText(e) {
         return e.srcElement.innerText;
     }
 
-	function resultShow(res){
-		let div = `
+    /**
+     * 获取内容正文(包括html标签)
+     * @param e
+     * @returns {string}
+     */
+    function getHtml(e) {
+        return e.srcElement.outerHTML;
+    }
+
+    /**
+     * 展示获取的结果
+     * @param res
+     */
+    function resultShow(res) {
+        const keyDict = {
+            webUrl: {
+                id: 'self-web-info-webUrl',
+                name: '主页链接'
+            },
+            columnTitle: {
+                id: 'self-web-info-columnTitle',
+                name: '分类标题'
+            },
+            columnUrl: {
+                id: 'self-web-info-columnUrl',
+                name: '分类链接'
+            },
+            charset: {
+                id: 'self-web-info-charset',
+                name: '网站编码'
+            },
+            xpathArticleTitle: {
+                id: 'self-web-info-xpathArticleTitle',
+                name: '标题路径'
+            },
+            xpathArticleContent: {
+                id: 'self-web-info-xpathArticleContent',
+                name: '正文路径'
+            },
+        };
+        let divHead = `
 		<div class="crawler-result-show" style="text-align: left">
 			<div class="self-header">
 			    <h3>
@@ -178,31 +239,18 @@ document.addEventListener('DOMContentLoaded', function()
                         <col width="80%">
                     </colgroup>
 			        <tbody>
-			            <tr>
-			                <td>主页链接</td>
-			                <td id="self-web-info-origin"></td>
-                        </tr>
-                        <tr>
-			                <td>分类标题</td>
-			                <td id="self-web-info-title"></td>
-                        </tr>
-                        <tr>
-			                <td>分类链接</td>
-			                <td id="self-web-info-baseURI"></td>
-                        </tr>
-                        <tr>
-			                <td>网站编码</td>
-			                <td id="self-web-info-charset"></td>
-                        </tr>
-                        <tr>
-			                <td>标题路径</td>
-			                <td id="self-web-info-xpath-title"></td>
-                        </tr>
-                        <tr>
-			                <td>正文路径</td>
-			                <td id="self-web-info-xpath-text"></td>
-                        </tr>
-                    </tbody>
+	    `;
+        let divBody = '';
+        Object.keys(keyDict).forEach(k => {
+            let value = keyDict[k];
+            divBody +=
+                `<tr>
+                    <td>${value.name}</td>
+                    <td id="${value.id}"></td>
+                </tr>
+                `
+        });
+        const divFoot = `</tbody>
                 </table>
 			</div>
 			<div class="self-content">
@@ -222,13 +270,12 @@ document.addEventListener('DOMContentLoaded', function()
             </div>
 		</div>
 		`;
-		div = $(div);
-        div.find('#self-web-info-origin').html(res.origin);
-        div.find('#self-web-info-title').html(res.title);
-        div.find('#self-web-info-baseURI').html(res.baseURI);
-        div.find('#self-web-info-charset').html(res.charset);
-        div.find('#self-web-info-xpath-title').html(res.xpathTitle);
-        div.find('#self-web-info-xpath-text').html(res.xpathText);
+        let div = divHead + divBody + divFoot;
+        div = $(div);
+        Object.keys(keyDict).forEach(k => {
+            let value = keyDict[k];
+            div.find(`#${value.id}`).html(res[k]);
+        });
         const height = document.documentElement.clientHeight;
         const width = document.documentElement.clientWidth;
         div.find('.self-res-div').css({
@@ -238,66 +285,51 @@ document.addEventListener('DOMContentLoaded', function()
         const tip = div.find('#self-span-tip');
         showTip(tip, action);
         div.find('#self-button-switch').click(function () {
-        	action = action === 'title'?'text':'title';
-            saveLocalStorage({'action':action});
+            action = action === 'title' ? 'text' : 'title';
+            saveLocalStorage({'action': action});
             showTip(tip, action);
         });
-        let tbody = div.find('#self-result-table tbody');
+        let tBody = div.find('#self-result-table tbody');
         if (action === 'title') {
-            tbody.append($('<tr><td colspan="2">标题有效结果</td></tr>'));
-            let validResults = res.validResults;
-            for (let i=0;i<validResults.length;i++){
-                let a = validResults[i];
-                tbody.append(
-                    $('<tr>' +
-                        '<td style="text-align: right;">'+(i+1)+'</td>' +
-                        '<td><a href='+a.href+' target="_blank">'+a.title+'</a></td>' +
-                        '</tr>')
-                );
+            tBody.append($('<tr><td colspan="2">标题有效结果</td></tr>'));
+            let articleList = res.articleList;
+            for (let i = 0; i < articleList.length; i++) {
+                let a = articleList[i];
+                tBody.append(articleColumn(a, i));
             }
-            tbody.append($('<tr><td colspan="2">标题无效结果</td></tr>'));
+            tBody.append($('<tr><td colspan="2">标题无效结果</td></tr>'));
             let invalidResults = res.invalidResults;
-            for (let i=0;i<invalidResults.length;i++){
+            for (let i = 0; i < invalidResults.length; i++) {
                 let a = invalidResults[i];
-                tbody.append(
-                    $('<tr>' +
-                        '<td style="text-align: right;">'+(i+1)+'</td>' +
-                        '<td><span>'+a.title+'</span></td>' +
-                        '</tr>')
-                );
+                tBody.append(articleColumn(a, i));
             }
         } else if (action === 'text') {
-            let validResults = res.validResults;
+            let articleList = res.articleList;
             let trs = [];
-            trs.push($('<tr><td colspan="2">标题结果(共'+validResults.length+'条)</td></tr>'));
-            for (let i=0;i<validResults.length;i++) {
-                let a = validResults[i];
-                trs.push(
-                    $('<tr>' +
-                        '<td style="text-align: right;">' + (i + 1) + '</td>' +
-                        '<td><a href=' + a.href + ' target="_blank">' + a.title + '</a></td>' +
-                        '</tr>')
-                );
+            trs.push($(`<tr><td colspan="2">标题结果(共${articleList.length}条)</td></tr>`));
+            for (let i = 0; i < articleList.length; i++) {
+                let a = articleList[i];
+                trs.push(articleColumn(a, i));
             }
-            trs.splice(3,trs.length-5,$('<tr><td colspan="2">......</td></tr>'));
-            tbody.html(trs);
+            trs.splice(3, trs.length - 5, $('<tr><td colspan="2">......</td></tr>'));
+            tBody.html(trs);
 
             let text = res.text;
-            tbody.append($('<tr><td colspan="2">正文结果(约' + text.length + '字)</td></tr>'));
+            tBody.append($('<tr><td colspan="2">正文结果(约' + text.length + '字)</td></tr>'));
             if (text.length > 100) {
-                text = text.substr(0,50) + '<br>......<br>' + text.substr(-50);
+                text = text.substr(0, 50) + '<br>......<br>' + text.substr(-50);
             }
-            tbody.append($('<tr><td colspan="2" style="width: 20em">' + text + '</td></tr>'));
-		}
-		let button_submit = $('<button id="self-button-submit" style="margin:0 10px;">确定选择</button>');
-        button_submit.click(function(){
-            save_result(res);
+            tBody.append($('<tr><td colspan="2" style="width: 20em">' + text + '</td></tr>'));
+        }
+        let button_submit = $('<button id="self-button-submit" style="margin:0 10px;">确定选择</button>');
+        button_submit.click(function () {
+            saveResult(res);
         });
         let button_select_text = $('<button id="self-button-select-text" style="margin:0 10px;">选择正文</button>');
-        button_select_text.click(function(){
-            tbody.find('a:first')[0].click();
-            saveLocalStorage({'action':'text'});
-            saveLocalStorage({'result':res});
+        button_select_text.click(function () {
+            tBody.find('a:first')[0].click();
+            saveLocalStorage({'action': 'text'});
+            saveLocalStorage({'crawlerResult': res});
             remove_result_show();
         });
         if (action === 'title') {
@@ -308,67 +340,103 @@ document.addEventListener('DOMContentLoaded', function()
             button_select_text.hide();
         }
         let button_reselect = $('<button id="self-button-reselect" style="margin:0 10px;">重新选择</button>');
-        button_reselect.click(function(){
+        button_reselect.click(function () {
             remove_result_show();
         });
         let footer = div.find('.self-footer');
         footer.append(button_submit);
         footer.append(button_select_text);
         footer.append(button_reselect);
-		$('body').append(div);
-	}
-
-	function showTip(ele, action) {
-        ele.html(action === 'title'?'抓取标题':'抓取正文');
+        $('body').append(div);
     }
 
-	function save_result(res){
+    /**
+     * table展示标题数组时生产列数据
+     * @param article 文章对象
+     * @param index 序号
+     * @returns {jQuery.fn.init|jQuery|HTMLElement}
+     */
+    function articleColumn(article, index) {
+        return $(`
+            <tr>
+                <td style="text-align: right;">${index + 1}</td>
+                <td><a href="${article.url}" target="_blank">${article.title}</a></td>
+            </tr>
+        `)
+    }
+
+    /**
+     * 显示当前行为方式的提示
+     * @param ele
+     * @param action
+     */
+    function showTip(ele, action) {
+        ele.html(action === 'title' ? '抓取标题' : '抓取正文');
+    }
+
+    /**
+     * 保存爬取结果
+     * @param res
+     */
+    function saveResult(res) {
         let config = {
-            userInfo:null
+            token: null
         };
-        chrome.storage.sync.get(config,function (value) {
-            let userInfo = value.userInfo;
-            if (userInfo) {
-                res.userId = userInfo.id;
+        chrome.storage.sync.get(config, function (value) {
+            let token = value.token;
+            delete res.text;
+            delete res.html;
+            delete res.invalidResults;
+            if (token) {
                 $.ajax({
                     // url:'http://47.106.140.189/crawler/plugin/save',
-                    url:'http://localhost:7020/plugin/save',
+                    url: 'http://localhost:7120/plugin/save',
                     type: 'post',
-                    data: {
-                        crawlerResult: JSON.stringify(res)
-					},
-					async: true,
-					dataType: 'json'
-                }).success(function(response){
+                    data: JSON.stringify(res),
+                    async: true,
+                    dataType: 'json',
+                    headers: {'Content-Type': 'application/json;charset=utf8', 'token': token}
+                }).success(function (response) {
                     alert('添加成功');
-                    saveLocalStorage({'action':'title'});
+                    saveLocalStorage({'action': 'title'});
                     action = 'title';
                     remove_result_show();
                 }).fail(function (response) {
                     alert('添加失败')
                 })
             } else {
-                alert('操作失败，请前往【chrome设置->更多工具->扩展程序->详细信息->扩展程序选项】配置秘钥')
+                alert('操作失败，请登录或刷新')
             }
         })
-	}
+    }
 
-	function remove_result_show () {
-		$('.crawler-result-show').remove();
-		show_context_menu = false;
-		show_border = true;
-	}
+    function remove_result_show() {
+        $('.crawler-result-show').remove();
+        show_context_menu = false;
+        show_border = true;
+    }
 
-	document.onmouseover = function(e){
-		if (show_border){
-			$(e.srcElement).addClass('myself-mouseover-selected')
-		}
-	};
+    document.onmouseover = function (e) {
+        if (show_border) {
+            $(e.srcElement).addClass('myself-mouseover-selected')
+        }
+    };
 
-	document.onmouseout = function(e){
-		if (show_border){
-			$(e.srcElement).removeClass('myself-mouseover-selected')
-		}
-	};
+    document.onmouseout = function (e) {
+        if (show_border) {
+            $(e.srcElement).removeClass('myself-mouseover-selected')
+        }
+    };
+
+    window.addEventListener("message", receiveMessage, false);
+
+    function receiveMessage(event) {
+        let origin = event.origin || event.originalEvent.origin;
+        if (origin !== 'http://localhost:7000') {
+            return
+        }
+        let data = event.data;
+        saveLocalStorage(data)
+    }
 
 });
