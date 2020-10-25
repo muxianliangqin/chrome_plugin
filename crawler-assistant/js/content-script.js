@@ -2,6 +2,17 @@
 let show_border = true;
 let action = '';
 
+ACTION_TITLE = 'title'
+ACTION_PAGE = 'page'
+ACTION_TEXT = 'text'
+
+DESC_TITLE = '标题'
+DESC_PAGE = '分页'
+DESC_TEXT = '正文'
+
+RESULT_SAVE_URL = 'http://47.106.140.189/crawler/plugin/save'
+// RESULT_SAVE_URL = 'http://localhost:7120/plugin/save'
+
 console.log('这是content script!');
 
 // 注意，必须设置了run_at=document_start 此段代码才会生效
@@ -12,19 +23,31 @@ document.addEventListener('DOMContentLoaded', function () {
     };
 
     chrome.storage.local.get({action: ''}, function (value) {
-        action = value.action || 'title';
+        action = value.action || ACTION_TITLE;
     });
 
     console.log('监听鼠标点击事件');
     document.onmousedown = function (e) {
-        if (e.button === 2 && !show_context_menu && $('.crawler-result-show').length == 0) {
+        if (e.button === 2 && !show_context_menu && $('.crawler-result-show').length === 0) {
             // let show = $('.crawler-result-show');
             let xpath = getXpath(e);
-            if (action === 'title') {
+            if (action === ACTION_TITLE) {
                 let res = getTitle(e);
                 res.xpathArticleTitle = xpath;
+                res.xpathArticlePage = '';
+                res.text = ''
                 resultShow(res);
-            } else if (action === 'text') {
+            } else if (action === ACTION_PAGE) {
+                let column_url = e.currentTarget.baseURI
+                chrome.storage.local.get({'crawlerResult': {}}, function (value) {
+                    let res = value.crawlerResult;
+                    if (column_url !== res.columnUrl) {
+                        res = crawlerResult()
+                    }
+                    res.xpathArticlePage = xpath;
+                    resultShow(res);
+                });
+            } else if (action === ACTION_TEXT) {
                 let text = getText(e);
                 let html = getHtml(e);
                 chrome.storage.local.get({'crawlerResult': {}}, function (value) {
@@ -52,6 +75,7 @@ document.addEventListener('DOMContentLoaded', function () {
             charset: '',
             xpathArticleTitle: '',
             xpathArticleContent: '',
+            xpathArticlePage: '',
             text: '',
             html: '',
             articleList: [],
@@ -65,7 +89,7 @@ document.addEventListener('DOMContentLoaded', function () {
      */
     function saveLocalStorage(config) {
         chrome.storage.local.set(config, function () {
-            console.log('saveLocalStorage成功');
+            console.log(`saveLocalStorage成功:${JSON.stringify(config)}`);
         })
     }
 
@@ -194,7 +218,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     /**
      * 展示获取的结果
-     * @param res
+     * @param res 爬取结果
      */
     function resultShow(res) {
         const keyDict = {
@@ -216,11 +240,15 @@ document.addEventListener('DOMContentLoaded', function () {
             },
             xpathArticleTitle: {
                 id: 'self-web-info-xpathArticleTitle',
-                name: '标题路径'
+                name: `${DESC_TITLE}路径`
+            },
+            xpathArticlePage: {
+                id: 'self-web-info-xpathArticlePage',
+                name: `${DESC_PAGE}路径`
             },
             xpathArticleContent: {
                 id: 'self-web-info-xpathArticleContent',
-                name: '正文路径'
+                name: `${DESC_TEXT}路径`
             },
         };
         let divHead = `
@@ -235,8 +263,8 @@ document.addEventListener('DOMContentLoaded', function () {
 			    </h3>
 			    <table style="width: 100%">
 			        <colgroup>
-                        <col width="20%">
-                        <col width="80%">
+                        <col style="width: 20%">
+                        <col style="width: 80%">
                     </colgroup>
 			        <tbody>
 	    `;
@@ -258,8 +286,8 @@ document.addEventListener('DOMContentLoaded', function () {
 			    <div class="self-res-div">
 			        <table id="self-result-table" style="width: 100%">
                         <colgroup>
-                            <col width="5%">
-                            <col width="95%">
+                            <col style="width: 5%">
+                            <col style="width: 95%">
                         </colgroup>
                         <tbody>
                         </tbody>
@@ -283,14 +311,14 @@ document.addEventListener('DOMContentLoaded', function () {
             'max-width': width * 0.5 + 'px',
         });
         const tip = div.find('#self-span-tip');
-        showTip(tip, action);
+        tip.html(actionShowTip(action));
         div.find('#self-button-switch').click(function () {
-            action = action === 'title' ? 'text' : 'title';
+            action = actionChangeNext(action)
             saveLocalStorage({'action': action});
-            showTip(tip, action);
+            tip.html(actionShowTip(action));
         });
         let tBody = div.find('#self-result-table tbody');
-        if (action === 'title') {
+        if (action === ACTION_TITLE || action === ACTION_PAGE) {
             tBody.append($('<tr><td colspan="2">标题有效结果</td></tr>'));
             let articleList = res.articleList;
             for (let i = 0; i < articleList.length; i++) {
@@ -303,7 +331,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 let a = invalidResults[i];
                 tBody.append(articleColumn(a, i));
             }
-        } else if (action === 'text') {
+        } else if (action === ACTION_TEXT) {
             let articleList = res.articleList;
             let trs = [];
             trs.push($(`<tr><td colspan="2">标题结果(共${articleList.length}条)</td></tr>`));
@@ -325,26 +353,31 @@ document.addEventListener('DOMContentLoaded', function () {
         button_submit.click(function () {
             saveResult(res);
         });
-        let button_select_text = $('<button id="self-button-select-text" style="margin:0 10px;">选择正文</button>');
-        button_select_text.click(function () {
-            tBody.find('a:first')[0].click();
-            saveLocalStorage({'action': 'text'});
+        let button_select_page = $(`<button id="self-button-select-text" style="margin:0 10px;">选择${DESC_PAGE}</button>`);
+        let button_select_text = $(`<button id="self-button-select-text" style="margin:0 10px;">选择${DESC_TEXT}</button>`);
+        button_select_page.click(function () {
+            action = ACTION_PAGE
+            saveLocalStorage({'action': actionChangeNext(action)});
             saveLocalStorage({'crawlerResult': res});
             remove_result_show();
         });
-        if (action === 'title') {
-            button_submit.hide();
-            button_select_text.show();
-        } else if (action === 'text') {
-            button_submit.show();
-            button_select_text.hide();
-        }
+        button_select_text.click(function () {
+            if (undefined === res.articleList || res.articleList.length === 0) {
+                alert('没有抓取到文章标题列表，不可以跳转获取正文路径。\n请切换【抓取标题】模式重新抓取')
+            }
+            tBody.find('a:first')[0].click();
+            saveLocalStorage({'action': actionChangeNext(action)});
+            saveLocalStorage({'crawlerResult': res});
+            remove_result_show();
+        });
+        actionShowButton(action, button_submit, button_select_page, button_select_text)
         let button_reselect = $('<button id="self-button-reselect" style="margin:0 10px;">重新选择</button>');
         button_reselect.click(function () {
             remove_result_show();
         });
         let footer = div.find('.self-footer');
         footer.append(button_submit);
+        footer.append(button_select_page);
         footer.append(button_select_text);
         footer.append(button_reselect);
         $('body').append(div);
@@ -367,12 +400,67 @@ document.addEventListener('DOMContentLoaded', function () {
 
     /**
      * 显示当前行为方式的提示
-     * @param ele
      * @param action
      */
-    function showTip(ele, action) {
-        ele.html(action === 'title' ? '抓取标题' : '抓取正文');
+    function actionShowTip(action) {
+        let tip
+        switch (action) {
+            case ACTION_TITLE:
+                tip = `抓取${DESC_TITLE}`
+                break
+            case ACTION_TEXT:
+                tip = `抓取${DESC_TEXT}`
+                break
+            case ACTION_PAGE:
+                tip = `抓取${DESC_PAGE}`
+                break
+            default:
+                tip = `错误的模式:${action}`
+        }
+        return tip
     }
+
+    function actionShowButton(action, button_submit, button_select_history, button_select_text) {
+        switch (action) {
+            case ACTION_TITLE:
+                button_submit.hide();
+                button_select_history.show();
+                button_select_text.hide();
+                break
+            case ACTION_PAGE:
+                button_submit.hide();
+                button_select_history.hide();
+                button_select_text.show();
+                break
+            case ACTION_TEXT:
+                button_submit.show();
+                button_select_history.hide();
+                button_select_text.hide();
+                break
+            default:
+                button_submit.hide();
+                button_select_history.hide();
+                button_select_text.hide();
+        }
+    }
+
+    function actionChangeNext(action) {
+        switch (action) {
+            case ACTION_TITLE:
+                action = ACTION_PAGE
+                break
+            case ACTION_PAGE:
+                action = ACTION_TEXT
+                break
+            case ACTION_TEXT:
+                action = ACTION_TITLE
+                break
+            default:
+                action = ACTION_TITLE
+        }
+        return action
+    }
+
 
     /**
      * 保存爬取结果
@@ -389,19 +477,26 @@ document.addEventListener('DOMContentLoaded', function () {
             delete res.invalidResults;
             if (token) {
                 $.ajax({
-                    // url:'http://47.106.140.189/crawler/plugin/save',
-                    url: 'http://localhost:7120/plugin/save',
+                    url: RESULT_SAVE_URL,
+                    // url: RESULT_SAVE_URL_DEV,
                     type: 'post',
                     data: JSON.stringify(res),
                     async: true,
                     dataType: 'json',
-                    headers: {'Content-Type': 'application/json;charset=utf8', 'token': token}
-                }).success(function (response) {
+                    xhrFields: {
+                        withCredentials: true
+                    },
+                    crossDomain: true,
+                    headers: {
+                        'Content-Type': 'application/json;charset=utf8',
+                        'token': token
+                    }
+                }).success(function () {
                     alert('添加成功');
-                    saveLocalStorage({'action': 'title'});
-                    action = 'title';
+                    saveLocalStorage({'action': ACTION_TITLE});
+                    action = ACTION_TITLE;
                     remove_result_show();
-                }).fail(function (response) {
+                }).fail(function () {
                     alert('添加失败')
                 })
             } else {
