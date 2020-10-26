@@ -9,11 +9,18 @@ ACTION_TEXT = 'text'
 DESC_TITLE = '标题'
 DESC_PAGE = '分页'
 DESC_TEXT = '正文'
+/*
+ * 使用本插件时，请按以下步骤：
+ * 1、在浏览器扩展程序开启插件
+ * 2、登录网站，以便获取登录信息
+ * 3、去其他网页使用插件
+ */
+CHROME_STORAGE_LOCAL_KEY_INCLUDES = 'token,action,crawlerResult'
 
 RESULT_SAVE_URL = 'http://47.106.140.189/crawler/plugin/save'
 // RESULT_SAVE_URL = 'http://localhost:7120/plugin/save'
 
-console.log('这是content script!');
+console.log('欢迎使用插件，启动插件后请登录网站获取用户信息');
 
 // 注意，必须设置了run_at=document_start 此段代码才会生效
 document.addEventListener('DOMContentLoaded', function () {
@@ -88,8 +95,17 @@ document.addEventListener('DOMContentLoaded', function () {
      * @param config
      */
     function saveLocalStorage(config) {
-        chrome.storage.local.set(config, function () {
-            console.log(`saveLocalStorage成功:${JSON.stringify(config)}`);
+        const keyIncludes = CHROME_STORAGE_LOCAL_KEY_INCLUDES.split(',')
+        const keys = Object.keys(config)
+        keys.forEach(k => {
+            let v = config[k]
+            if (keyIncludes.includes(k)) {
+                let obj = {}
+                obj[k] = v
+                chrome.storage.local.set(obj, function () {
+                    console.log(`saveLocalStorage成功: ${JSON.stringify(obj)}`);
+                })
+            }
         })
     }
 
@@ -470,7 +486,7 @@ document.addEventListener('DOMContentLoaded', function () {
         let config = {
             token: null
         };
-        chrome.storage.sync.get(config, function (value) {
+        chrome.storage.local.get(config, function (value) {
             let token = value.token;
             delete res.text;
             delete res.html;
