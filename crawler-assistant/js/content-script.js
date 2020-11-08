@@ -17,7 +17,9 @@ DESC_TEXT = '正文'
  */
 CHROME_STORAGE_LOCAL_KEY_INCLUDES = 'token,action,crawlerResult'
 
+BASE_ORGIN = 'http://47.106.140.189'
 RESULT_SAVE_URL = 'http://47.106.140.189/crawler/plugin/save'
+// BASE_ORGIN = 'http://localhost:7000'
 // RESULT_SAVE_URL = 'http://localhost:7120/plugin/save'
 
 console.log('欢迎使用插件，启动插件后请登录网站获取用户信息');
@@ -188,7 +190,7 @@ document.addEventListener('DOMContentLoaded', function () {
         res.columnUrl = currentTarget.baseURI;
         res.columnTitle = currentTarget.title;
         res.charset = currentTarget.charset;
-        let invalidTitle = /^(首页|下一页|上一页|确定|末页|尾页|更多(\s+>>)?|\d+)$/;
+        let invalidTitle = /^\s*(首页|第一页|最后一页|下一页|上一页|确定|末页|尾页|更多|查看更多|>+|\d+)?\s*$/;
         let invalidHref = /^(\.\/|\.\.\/)((\.\.\/)+)?$/;
         for (let i = 0; i < as.length; i++) {
             let a = as[i];
@@ -543,7 +545,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function receiveMessage(event) {
         let origin = event.origin || event.originalEvent.origin;
-        if (origin !== 'http://localhost:7000') {
+        if (origin !== BASE_ORGIN) {
             return
         }
         let data = event.data;
